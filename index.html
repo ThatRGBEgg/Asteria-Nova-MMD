@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Asteria Nova MMD</title>
+    
+    <!-- Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        accent: 'var(--accent-color, #ff3366)', 
+                        textMain: '#ffffff',
+                        textSub: 'rgba(255,255,255,0.6)',
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'Segoe UI', 'Roboto', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            --accent-color: #ff3366;
+            --bg-blur: 0px;
+        }
+
+        body {
+            background-color: #050505;
+            overscroll-behavior-y: none;
+            -webkit-tap-highlight-color: transparent;
+            overflow: hidden;
+        }
+
+        /* Milky Way Background */
+        .ambient-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            background-image: url('https://images.unsplash.com/photo-1436891620584-47fd0e565afb?q=80&w=2000&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+            filter: blur(var(--bg-blur));
+            transition: filter 0.5s ease;
+        }
+
+        /* Dark overlay for readability */
+        .bg-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.4), rgba(0,0,0,0.8));
+            z-index: 1;
+        }
+
+        .menu-overlay {
+            background: rgba(10, 10, 15, 0.92); 
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            transition: transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 100;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .menu-overlay.hidden-top {
+            transform: translateY(-125%);
+            transition: transform 0.6s cubic-bezier(0.36, -0.56, 0.66, 1);
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-btn {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            outline: none !important;
+        }
+        
+        .btn-press:active {
+            transform: scale(0.85);
+            background: rgba(255, 255, 255, 0.15);
+            color: var(--accent-color);
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            outline: none;
+            cursor: pointer;
+            z-index: 50;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 32px;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 32px;
+            width: 32px;
+            background: transparent;
+            -webkit-appearance: none;
+        }
+
+        /* Toggle logic */
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: var(--accent-color);
+        }
+        .toggle-checkbox:checked + .toggle-label .toggle-dot {
+            transform: translateX(100%);
+        }
+
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+    </style>
+</head>
+<body class="text-textMain h-screen w-screen flex flex-col antialiased relative overflow-hidden">
+
+    <div class="ambient-bg"></div>
+    <div class="bg-overlay"></div>
+
+    <!-- HIDDEN INPUTS -->
+    <input type="file" id="folder-input" webkitdirectory directory multiple class="hidden">
+
+    <!-- LIBRARY MENU -->
+    <div id="library-menu" class="fixed inset-6 rounded-[48px] menu-overlay hidden-top flex flex-col p-8">
+        <header class="flex items-center justify-between mb-6">
+            <button id="library-back-btn" class="glass-btn btn-press w-10 h-10 rounded-full flex items-center justify-center">
+                <i data-lucide="chevron-left" class="w-6 h-6"></i>
+            </button>
+            <h2 class="text-xl font-bold">Your Library</h2>
+            <div class="w-10"></div> 
+        </header>
+
+        <div class="relative w-full mb-6">
+            <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30"></i>
+            <input type="text" id="library-search" placeholder="Search your songs..." class="w-full bg-white/5 border border-white/10 py-3 pl-11 pr-4 rounded-full text-sm outline-none focus:border-white/30 transition-all">
+        </div>
+
+        <div id="song-list" class="flex-1 overflow-y-auto custom-scroll space-y-1">
+            <div class="flex flex-col items-center justify-center h-full text-white/20 text-center px-6">
+                <i data-lucide="music" class="w-12 h-12 mb-4 opacity-10"></i>
+                <p class="text-sm font-medium">Upload a folder to see your songs</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTINGS MENU -->
+    <div id="settings-menu" class="fixed inset-6 rounded-[48px] menu-overlay hidden-top flex flex-col p-8 custom-scroll overflow-y-auto">
+        <header class="flex items-center justify-between mb-8">
+            <button id="settings-back-btn" class="glass-btn btn-press w-10 h-10 rounded-full flex items-center justify-center text-white/70">
+                <i data-lucide="chevron-left" class="w-6 h-6"></i>
+            </button>
+            <h2 class="text-xl font-bold tracking-tight">Settings</h2>
+            <div class="w-10"></div> 
+        </header>
+
+        <div class="flex flex-col gap-10">
+            <!-- Theme Colors -->
+            <section>
+                <label class="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 block mb-5">Theme Accent</label>
+                <div class="flex justify-between gap-2 px-1">
+                    <button onclick="updateThemeColor('#ff3366')" class="w-11 h-11 rounded-full border-2 border-white/10 transition-transform active:scale-90" style="background-color: #ff3366"></button>
+                    <button onclick="updateThemeColor('#00f2ff')" class="w-11 h-11 rounded-full border-2 border-white/10 transition-transform active:scale-90" style="background-color: #00f2ff"></button>
+                    <button onclick="updateThemeColor('#bd00ff')" class="w-11 h-11 rounded-full border-2 border-white/10 transition-transform active:scale-90" style="background-color: #bd00ff"></button>
+                    <button onclick="updateThemeColor('#00ff85')" class="w-11 h-11 rounded-full border-2 border-white/10 transition-transform active:scale-90" style="background-color: #00ff85"></button>
+                    <button onclick="updateThemeColor('#ff9100')" class="w-11 h-11 rounded-full border-2 border-white/10 transition-transform active:scale-90" style="background-color: #ff9100"></button>
+                </div>
+            </section>
+
+            <!-- Playback Speed -->
+            <section>
+                <div class="flex justify-between items-center mb-3">
+                    <label class="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Playback Speed</label>
+                    <span id="speed-val" class="text-xs font-black text-accent">1.0x</span>
+                </div>
+                <div class="relative w-full h-8 flex items-center">
+                    <input type="range" id="speed-slider" min="50" max="200" value="100" class="z-20">
+                    <div class="absolute inset-x-0 h-1 bg-white/10 rounded-full pointer-events-none">
+                        <div id="speed-fill" class="absolute h-full bg-accent w-1/2 rounded-full"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Background Blur -->
+            <section>
+                <div class="flex justify-between items-center mb-3">
+                    <label class="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Atmosphere Blur</label>
+                    <span id="blur-val" class="text-xs font-black text-accent">0px</span>
+                </div>
+                <div class="relative w-full h-8 flex items-center">
+                    <input type="range" id="blur-slider" min="0" max="100" value="0" class="z-20">
+                    <div class="absolute inset-x-0 h-1 bg-white/10 rounded-full pointer-events-none">
+                        <div id="blur-fill" class="absolute h-full bg-accent w-0 rounded-full"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Toggles -->
+            <section class="flex flex-col gap-6">
+                <div class="flex justify-between items-center">
+                    <label class="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">High Performance</label>
+                    <div class="relative inline-block w-12 h-6 align-middle select-none">
+                        <input type="checkbox" id="perf-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-all duration-300 outline-none"/>
+                        <label for="perf-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-white/10 cursor-pointer transition-all duration-300">
+                            <span class="toggle-dot block w-6 h-6 rounded-full bg-white shadow-md transform transition-all duration-300"></span>
+                        </label>
+                    </div>
+                </div>
+            </section>
+
+            <button onclick="location.reload()" class="mt-4 w-full py-4 rounded-3xl bg-white/5 border border-white/10 text-white/60 text-[10px] font-black uppercase tracking-[0.3em] btn-press">
+                Restart Session
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN UI -->
+    <div class="relative z-10 flex flex-col h-full px-6 pt-4 pb-6">
+        <header class="relative flex justify-between items-center w-full min-h-[50px]">
+            <div class="flex gap-3">
+                <button id="upload-trigger" class="glass-btn btn-press w-10 h-10 rounded-full flex items-center justify-center text-white/50" title="Upload Folder">
+                    <i data-lucide="file-up" class="w-5 h-5"></i>
+                </button>
+                <button id="library-open-btn" class="glass-btn btn-press w-10 h-10 rounded-full flex items-center justify-center text-white/50" title="Library">
+                    <i data-lucide="disc" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <span class="text-[11px] font-black tracking-[0.4em] text-white/30 uppercase absolute left-1/2 -translate-x-1/2 pointer-events-none">Asteria Nova</span>
+            <button id="settings-open-btn" class="glass-btn btn-press w-10 h-10 rounded-full flex items-center justify-center text-white/50" title="Settings">
+                <i data-lucide="settings" class="w-5 h-5"></i>
+            </button>
+        </header>
+
+        <main class="flex-1 flex flex-col items-center justify-center w-full py-4">
+            <div class="relative w-[65vw] h-[65vw] max-w-[280px] max-h-[280px] mb-8">
+                <div id="art-glow" class="absolute inset-[-15px] rounded-full bg-accent/20 blur-3xl transition-all duration-1000"></div>
+                <div class="w-full h-full rounded-full overflow-hidden border-4 border-white/10 relative shadow-2xl">
+                    <img id="main-album-art" src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=400&auto=format&fit=crop" class="w-full h-full object-cover" alt="Art">
+                </div>
+            </div>
+
+            <div class="text-center w-full px-4">
+                <h1 id="main-track-title" class="text-2xl font-black tracking-tight mb-1 truncate">No Track Loaded</h1>
+                <p id="main-artist-name" class="text-base text-white/40 font-medium truncate">Select a folder to begin</p>
+            </div>
+        </main>
+
+        <section class="w-full flex flex-col gap-5">
+            <!-- SCRUBBER -->
+            <div class="w-full">
+                <div class="relative w-full h-6 flex items-center">
+                    <input type="range" id="scrubber" min="0" max="1000" value="0" class="z-20">
+                    <div class="absolute inset-x-0 h-1 bg-white/10 rounded-full pointer-events-none">
+                        <div id="scrubber-fill" class="absolute h-full bg-white w-0 rounded-full"></div>
+                        <div id="scrubber-thumb" class="absolute w-3.5 h-3.5 bg-white rounded-full -top-1 shadow-[0_0_15px_rgba(255,255,255,1)]" style="left: 0%; transform: translateX(-50%);"></div>
+                    </div>
+                </div>
+                <div class="flex justify-between text-[10px] font-bold text-white/30 mt-1 tabular-nums">
+                    <span id="time-current">0:00</span>
+                    <span id="time-total">0:00</span>
+                </div>
+            </div>
+
+            <!-- CONTROLS -->
+            <div class="flex justify-between items-center px-1">
+                <button id="shuffle-btn" class="w-10 h-10 rounded-full flex items-center justify-center text-white/40 btn-press">
+                    <i data-lucide="shuffle" class="w-4 h-4"></i>
+                </button>
+                <div class="flex items-center gap-6">
+                    <button id="prev-btn" class="w-12 h-12 rounded-full flex items-center justify-center text-white btn-press">
+                        <i data-lucide="skip-back" class="w-6 h-6 fill-current"></i>
+                    </button>
+                    <button id="play-btn" class="glass-btn btn-press w-16 h-16 rounded-full flex items-center justify-center text-white shadow-2xl">
+                        <i data-lucide="play" id="icon-play" class="w-8 h-8 fill-current ml-1"></i>
+                        <i data-lucide="pause" id="icon-pause" class="w-8 h-8 fill-current hidden"></i>
+                    </button>
+                    <button id="next-btn" class="w-12 h-12 rounded-full flex items-center justify-center text-white btn-press">
+                        <i data-lucide="skip-forward" class="w-6 h-6 fill-current"></i>
+                    </button>
+                </div>
+                <button id="repeat-btn" class="w-10 h-10 rounded-full flex items-center justify-center text-white/40 btn-press">
+                    <i data-lucide="repeat" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- VOLUME -->
+            <div class="w-full px-2">
+                <div class="flex items-center gap-4">
+                    <i data-lucide="volume-1" class="w-3.5 h-3.5 text-white/20"></i>
+                    <div class="relative flex-1 h-6 flex items-center">
+                        <input type="range" id="volume-slider" min="0" max="100" value="80" class="z-20">
+                        <div class="absolute inset-x-0 h-1 bg-white/10 rounded-full pointer-events-none">
+                            <div id="volume-fill" class="absolute h-full bg-white/60 rounded-full"></div>
+                            <div id="volume-thumb" class="absolute w-2.5 h-2.5 bg-white rounded-full -top-[3.5px] shadow-[0_0_8px_rgba(255,255,255,0.5)]" style="transform: translateX(-50%);"></div>
+                        </div>
+                    </div>
+                    <i data-lucide="volume-2" class="w-3.5 h-3.5 text-white/20"></i>
+                </div>
+            </div>
+
+            <!-- UP NEXT -->
+            <div id="up-next-container" class="w-full opacity-0 pointer-events-none transition-opacity duration-500">
+                <div class="glass-panel rounded-[24px] p-3 flex items-center gap-4 shadow-xl">
+                    <div class="w-10 h-10 rounded-full overflow-hidden border border-white/10 bg-white/5">
+                        <img id="next-art" src="" class="w-full h-full object-cover hidden" alt="Next">
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-[8px] font-black tracking-[0.2em] text-white/20 uppercase mb-0.5">Up Next</p>
+                        <h3 id="next-title" class="text-[11px] font-bold text-white/90 truncate">---</h3>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // --- AUDIO ENGINE ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx, gainNode, sourceNode;
+        const audio = new Audio();
+        audio.crossOrigin = "anonymous";
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+                gainNode = audioCtx.createGain();
+                sourceNode = audioCtx.createMediaElementSource(audio);
+                sourceNode.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                syncVolume();
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        // --- STATE ---
+        let playlist = [];
+        let currentIndex = -1;
+        let shuffleMode = false;
+        let repeatMode = 0; 
+        let shuffledQueue = [];
+        
+        // --- ELEMENTS ---
+        const els = {
+            uploadTrigger: document.getElementById('upload-trigger'),
+            folderInput: document.getElementById('folder-input'),
+            songList: document.getElementById('song-list'),
+            search: document.getElementById('library-search'),
+            playBtn: document.getElementById('play-btn'),
+            iconPlay: document.getElementById('icon-play'),
+            iconPause: document.getElementById('icon-pause'),
+            prevBtn: document.getElementById('prev-btn'),
+            nextBtn: document.getElementById('next-btn'),
+            shuffleBtn: document.getElementById('shuffle-btn'),
+            repeatBtn: document.getElementById('repeat-btn'),
+            scrubber: document.getElementById('scrubber'),
+            scrubberFill: document.getElementById('scrubber-fill'),
+            scrubberThumb: document.getElementById('scrubber-thumb'),
+            volumeSlider: document.getElementById('volume-slider'),
+            volumeFill: document.getElementById('volume-fill'),
+            volumeThumb: document.getElementById('volume-thumb'),
+            timeCurrent: document.getElementById('time-current'),
+            timeTotal: document.getElementById('time-total'),
+            mainTitle: document.getElementById('main-track-title'),
+            mainArtist: document.getElementById('main-artist-name'),
+            mainArt: document.getElementById('main-album-art'),
+            nextContainer: document.getElementById('up-next-container'),
+            nextTitle: document.getElementById('next-title'),
+            nextArt: document.getElementById('next-art'),
+            artGlow: document.getElementById('art-glow'),
+            libMenu: document.getElementById('library-menu'),
+            setMenu: document.getElementById('settings-menu'),
+            speedSlider: document.getElementById('speed-slider'),
+            speedVal: document.getElementById('speed-val'),
+            speedFill: document.getElementById('speed-fill'),
+            blurSlider: document.getElementById('blur-slider'),
+            blurVal: document.getElementById('blur-val'),
+            blurFill: document.getElementById('blur-fill')
+        };
+
+        // --- SETTINGS ---
+        function updateThemeColor(color) {
+            document.documentElement.style.setProperty('--accent-color', color);
+            const sliders = ['speed-fill', 'blur-fill'];
+            sliders.forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.style.backgroundColor = color;
+            });
+        }
+
+        els.speedSlider.oninput = (e) => {
+            const val = e.target.value / 100;
+            audio.playbackRate = val;
+            els.speedVal.innerText = val.toFixed(1) + 'x';
+            els.speedFill.style.width = `${(e.target.value - 50) / 1.5}%`;
+        };
+
+        els.blurSlider.oninput = (e) => {
+            const val = e.target.value;
+            document.documentElement.style.setProperty('--bg-blur', val + 'px');
+            els.blurVal.innerText = val + 'px';
+            els.blurFill.style.width = `${val}%`;
+        };
+
+        function syncVolume() {
+            const val = els.volumeSlider.value;
+            if (gainNode) gainNode.gain.setTargetAtTime(val / 100, audioCtx.currentTime, 0.02);
+            els.volumeFill.style.width = `${val}%`;
+            els.volumeThumb.style.left = `${val}%`;
+        }
+
+        // --- NAVIGATION ---
+        els.uploadTrigger.onclick = () => els.folderInput.click();
+        document.getElementById('library-open-btn').onclick = () => els.libMenu.classList.remove('hidden-top');
+        document.getElementById('library-back-btn').onclick = () => els.libMenu.classList.add('hidden-top');
+        document.getElementById('settings-open-btn').onclick = () => els.setMenu.classList.remove('hidden-top');
+        document.getElementById('settings-back-btn').onclick = () => els.setMenu.classList.add('hidden-top');
+
+        // --- FOLDER LOGIC ---
+        els.folderInput.onchange = async (e) => {
+            const files = Array.from(e.target.files).filter(f => f.type.startsWith('audio/'));
+            if (!files.length) return;
+            playlist = [];
+            els.songList.innerHTML = '<div class="text-center py-10 opacity-30 text-xs">Parsing files...</div>';
+            for (let file of files) {
+                const track = await parseMetadata(file);
+                playlist.push(track);
+            }
+            renderLibrary(playlist);
+            if (playlist.length) loadTrack(0);
+        };
+
+        async function parseMetadata(file) {
+            return new Promise((resolve) => {
+                jsmediatags.read(file, {
+                    onSuccess: (tag) => {
+                        const { tags } = tag;
+                        let art = null;
+                        if (tags.picture) {
+                            const { data, format } = tags.picture;
+                            let base64 = "";
+                            for (let i = 0; i < data.length; i++) base64 += String.fromCharCode(data[i]);
+                            art = `data:${format};base64,${window.btoa(base64)}`;
+                        }
+                        resolve({
+                            title: tags.title || file.name.replace(/\.[^/.]+$/, ""),
+                            artist: tags.artist || "Unknown Artist",
+                            art, url: URL.createObjectURL(file)
+                        });
+                    },
+                    onError: () => resolve({
+                        title: file.name.replace(/\.[^/.]+$/, ""),
+                        artist: "Unknown Artist", art: null, url: URL.createObjectURL(file)
+                    })
+                });
+            });
+        }
+
+        function renderLibrary(tracks) {
+            els.songList.innerHTML = '';
+            tracks.forEach((track, index) => {
+                const isCurrent = currentIndex === index;
+                const item = document.createElement('div');
+                item.className = `flex items-center gap-4 p-3 rounded-2xl cursor-pointer transition-all active:bg-white/10 ${isCurrent ? 'bg-white/5' : ''}`;
+                item.innerHTML = `
+                    <div class="w-10 h-10 rounded-full overflow-hidden bg-white/5 flex-shrink-0">
+                        <img src="${track.art || 'https://via.placeholder.com/100'}" class="w-full h-full object-cover">
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h4 class="text-sm font-bold truncate ${isCurrent ? 'text-accent' : ''}">${track.title}</h4>
+                        <p class="text-[10px] text-white/30 truncate">${track.artist}</p>
+                    </div>
+                `;
+                item.onclick = () => { loadTrack(index); els.libMenu.classList.add('hidden-top'); };
+                els.songList.appendChild(item);
+            });
+        }
+
+        // --- ENGINE ---
+        function loadTrack(index) {
+            if (index < 0 || index >= playlist.length) return;
+            currentIndex = index;
+            const track = playlist[index];
+            audio.src = track.url;
+            els.mainTitle.innerText = track.title;
+            els.mainArtist.innerText = track.artist;
+            els.mainArt.src = track.art || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=400&auto=format&fit=crop';
+            updateUpNext();
+            renderLibrary(playlist);
+            playTrack();
+        }
+
+        function playTrack() {
+            if (!audio.src) return;
+            initAudio();
+            audio.play().catch(() => {});
+            els.iconPlay.classList.add('hidden');
+            els.iconPause.classList.remove('hidden');
+        }
+
+        function pauseTrack() {
+            audio.pause();
+            els.iconPlay.classList.remove('hidden');
+            els.iconPause.classList.add('hidden');
+        }
+
+        els.playBtn.onclick = () => audio.paused ? playTrack() : pauseTrack();
+
+        els.nextBtn.onclick = () => {
+            let nextIdx;
+            if (shuffleMode && shuffledQueue.length) {
+                let pos = (shuffledQueue.indexOf(currentIndex) + 1) % shuffledQueue.length;
+                nextIdx = shuffledQueue[pos];
+            } else {
+                nextIdx = (currentIndex + 1) % playlist.length;
+            }
+            loadTrack(nextIdx);
+        };
+
+        els.prevBtn.onclick = () => {
+            if (audio.currentTime > 3) { audio.currentTime = 0; return; }
+            let prevIdx = (currentIndex - 1 + playlist.length) % playlist.length;
+            loadTrack(prevIdx);
+        };
+
+        els.shuffleBtn.onclick = () => {
+            shuffleMode = !shuffleMode;
+            els.shuffleBtn.style.color = shuffleMode ? 'var(--accent-color)' : 'rgba(255,255,255,0.4)';
+            if (shuffleMode) shuffledQueue = Array.from(Array(playlist.length).keys()).sort(() => Math.random() - 0.5);
+            updateUpNext();
+        };
+
+        els.repeatBtn.onclick = () => {
+            repeatMode = (repeatMode + 1) % 3;
+            const icons = ['repeat', 'repeat', 'repeat-1'];
+            els.repeatBtn.querySelector('i').setAttribute('data-lucide', icons[repeatMode]);
+            els.repeatBtn.style.color = repeatMode > 0 ? 'var(--accent-color)' : 'rgba(255,255,255,0.4)';
+            lucide.createIcons();
+        };
+
+        audio.onended = () => {
+            if (repeatMode === 2) { audio.currentTime = 0; playTrack(); }
+            else els.nextBtn.click();
+        };
+
+        els.volumeSlider.oninput = syncVolume;
+
+        els.scrubber.oninput = (e) => {
+            if (!audio.duration) return;
+            const val = e.target.value;
+            audio.currentTime = (val / 1000) * audio.duration;
+            els.scrubberFill.style.width = `${val/10}%`;
+            els.scrubberThumb.style.left = `${val/10}%`;
+        };
+
+        audio.ontimeupdate = () => {
+            if (!audio.duration) return;
+            const perc = (audio.currentTime / audio.duration) * 100;
+            els.scrubber.value = perc * 10;
+            els.scrubberFill.style.width = `${perc}%`;
+            els.scrubberThumb.style.left = `${perc}%`;
+            els.timeCurrent.innerText = formatTime(audio.currentTime);
+            els.timeTotal.innerText = formatTime(audio.duration);
+        };
+
+        function formatTime(s) {
+            const m = Math.floor(s/60); const sc = Math.floor(s%60);
+            return `${m}:${sc < 10 ? '0' : ''}${sc}`;
+        }
+
+        function updateUpNext() {
+            if (playlist.length < 2) { els.nextContainer.classList.add('opacity-0'); return; }
+            let nextIdx;
+            if (shuffleMode && shuffledQueue.length) {
+                let pos = (shuffledQueue.indexOf(currentIndex) + 1) % shuffledQueue.length;
+                nextIdx = shuffledQueue[pos];
+            } else { nextIdx = (currentIndex + 1) % playlist.length; }
+            const track = playlist[nextIdx];
+            els.nextTitle.innerText = track.title;
+            if (track.art) { els.nextArt.src = track.art; els.nextArt.classList.remove('hidden'); }
+            else els.nextArt.classList.add('hidden');
+            els.nextContainer.classList.remove('opacity-0');
+        }
+
+        // Search logic
+        els.search.oninput = (e) => {
+            const term = e.target.value.toLowerCase();
+            const filtered = playlist.filter(t => t.title.toLowerCase().includes(term) || t.artist.toLowerCase().includes(term));
+            renderLibrary(filtered);
+        };
+
+    </script>
+</body>
+</html>
